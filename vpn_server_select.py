@@ -36,7 +36,7 @@ def choose_server(serverlist, regex=None):
             thread.start()
     for thread in mythreads:
         thread.join()
-    print myservers
+    print(myservers)
     return min(myservers, key=myservers.get)
 
 
@@ -105,10 +105,14 @@ if __name__ == '__main__':
 
     if arg.selection_metrics is '1':
         chosen_server = choose_server(serverlist=tryservers, regex=arg.regex)
-        print 'Fastest server in area: ' + chosen_server
+        print('Fastest server in area: ' + chosen_server)
     else:
-        print 'Not yet implemented'
+        print('Not yet implemented')
         sys.exit(1)
 
-    cmd_base = 'openvpn-gui --connect' if platform.system().lower() == 'windows' else 'sudo openvpn client '
-    subprocess.call(cmd_base + ' ' + chosen_server + '.tcp443.ovpn', shell=True)
+
+    if platform.system().lower() == 'windows':
+        cmd = 'openvpn-gui --connect' + chosen_server + '.tcp443.ovpn'
+    else:
+        cmd = 'openvpn '+ os.path.join(arg.path_files, chosen_server) + '.tcp443.ovpn'
+    subprocess.call(cmd , shell=True)
