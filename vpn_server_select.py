@@ -5,7 +5,9 @@ import platform
 import sys
 import os
 import threading
-import requests
+import urllib2
+import json
+
 
 __author__ = "Fabian Landis"
 __email__ = "flandis@flandis.com"
@@ -43,7 +45,7 @@ def choose_server(serverlist, regex=None, metrics='1'):
         print('Server latencies(ms):')
         print(myservers)
     if metrics is '2' or metrics is '3': # query latency from web page
-        loads = server_load(regex)
+        loads = server_load(serverlist, regex=regex)
         print('Server loads(%):')
         print(loads)
 
@@ -63,23 +65,12 @@ def choose_server(serverlist, regex=None, metrics='1'):
         return min(ranks, key=ranks.get)
 
 
-def server_load(regex):
+def server_load(serverlist, regex=None):
     server_loads = {}
-    s = requests.session()
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:50.0) Gecko/20100101 Firefox/50.0',
-               'Accept-Language': 'de,en-US;q=0.7,en;q=0.3',
-               'Accept': 'application/json, text/javascript, */*; q=0.01',
-               'Accept-Encoding': 'gzip, deflate, br',
-               'X-Requested-With': 'XMLHttpRequest',
-               'Referer': 'https://nordvpn.com/de/servers/'}
-    interesting_countries = ['Australia','Brazil','Canada','Germany','Switzerland','New Zealand','United States']
-    for country in interesting_countries:
-        payload = {'group': 'Standard VPN servers',
-               'country': country,
-               'action': 'getGroupRows'}
-        x2 = s.get('https://nordvpn.com/wp-admin/admin-ajax.php', params=payload, headers=headers, allow_redirects=True)
-        for server in x2.json():
-            if regex is None or re.match(regex, str(server['domain'])):
+    response = urllib2.urlopen('https://api.nordvpn.com/server')
+    for server in json.loads(response.read()):
+        if regex is None or re.match(regex, str(server['domain'])):
+            if str(server['domain']) in serverlist:
                 server_loads[str(server['domain'])] = server['load']
     return server_loads
 
