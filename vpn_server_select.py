@@ -5,6 +5,7 @@ import platform
 import sys
 import os
 import threading
+import requests
 
 __author__ = "Fabian Landis"
 __email__ = "flandis@flandis.com"
@@ -23,21 +24,64 @@ regex: regex to match dns name to restrict server selection
 """
 MAX_LATENCY = 10000
 single_matcher = re.compile(" time=(?P<time>\d+(.\d+)?)")
+load_matcher = re.compile("<td>(?P<server>\w+\.nordvpn\.com)</td>\S+<td>\S+<div class=\"progress-bar-container\">\S+<span class=\"status_bar\">\S+<span style=\"width: (?P<load>\d+)%")
 vpn_domain = 'nordvpn.com'
 
 
-def choose_server(serverlist, regex=None):
+def choose_server(serverlist, regex=None, metrics='1'):
     myservers = dict()
-    mythreads = []
-    for server in serverlist:
-        if regex is None or re.match(regex, server):
-            thread = threading.Thread(target=ping, args=(server, 3, myservers))
-            mythreads.append(thread)
-            thread.start()
-    for thread in mythreads:
-        thread.join()
-    print(myservers)
-    return min(myservers, key=myservers.get)
+    loads = None
+    if metrics is '1' or metrics is '3': # ping servers
+        mythreads = []
+        for server in serverlist:
+            if regex is None or re.match(regex, server):
+                thread = threading.Thread(target=ping, args=(server, 3, myservers))
+                mythreads.append(thread)
+                thread.start()
+        for thread in mythreads:
+            thread.join()
+        print('Server latencies(ms):')
+        print(myservers)
+    if metrics is '2' or metrics is '3': # query latency from web page
+        loads = server_load(regex)
+        print('Server loads(%):')
+        print(loads)
+
+    # find best server
+    if metrics is '1':
+        return min(myservers, key=myservers.get)
+    elif metrics is '2':
+        return min(loads, key=loads.get)
+    else: # optimize latency + load
+        print('Ranking of latency and load:')
+        ranks = dict()
+        for i,el in enumerate(sorted(myservers, key=myservers.get)):
+            ranks[el] = i
+        for i,el in enumerate(sorted(loads, key=loads.get)):
+            ranks[el] += i
+        print(ranks)
+        return min(ranks, key=ranks.get)
+
+
+def server_load(regex):
+    server_loads = {}
+    s = requests.session()
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64; rv:50.0) Gecko/20100101 Firefox/50.0',
+               'Accept-Language': 'de,en-US;q=0.7,en;q=0.3',
+               'Accept': 'application/json, text/javascript, */*; q=0.01',
+               'Accept-Encoding': 'gzip, deflate, br',
+               'X-Requested-With': 'XMLHttpRequest',
+               'Referer': 'https://nordvpn.com/de/servers/'}
+    interesting_countries = ['Australia','Brazil','Canada','Germany','Switzerland','New Zealand','United States']
+    for country in interesting_countries:
+        payload = {'group': 'Standard VPN servers',
+               'country': country,
+               'action': 'getGroupRows'}
+        x2 = s.get('https://nordvpn.com/wp-admin/admin-ajax.php', params=payload, headers=headers, allow_redirects=True)
+        for server in x2.json():
+            if regex is None or re.match(regex, str(server['domain'])):
+                server_loads[str(server['domain'])] = server['load']
+    return server_loads
 
 
 def ping(host, tries, mydict):
@@ -86,6 +130,8 @@ if __name__ == '__main__':
     cmdline_parse.add_argument('-r', '--regex', help='regex to match dns name to restrict server selection')
     cmdline_parse.add_argument('-v', '--verbose', help='print additional informations', default=False,
                                action='store_true')
+    cmdline_parse.add_argument('-u', '--udp', help='use udp instead of tcp',action="store_true")
+
     arg = cmdline_parse.parse_args()
 
     if arg.config_file:
@@ -103,16 +149,17 @@ if __name__ == '__main__':
                 if match:
                     tryservers.add(match.group('dns'))
 
-    if arg.selection_metrics is '1':
-        chosen_server = choose_server(serverlist=tryservers, regex=arg.regex)
-        print('Fastest server in area: ' + chosen_server)
+    chosen_server = choose_server(serverlist=tryservers, regex=arg.regex, metrics=arg.selection_metrics )
+    print('Fastest server in area: ' + chosen_server)
+
+    if arg.udp:
+        suffix = '.udp1194.ovpn'
     else:
-        print('Not yet implemented')
-        sys.exit(1)
+        suffix = '.tcp443.ovpn'
 
 
     if platform.system().lower() == 'windows':
-        cmd = 'openvpn-gui --connect' + chosen_server + '.tcp443.ovpn'
+        cmd = 'openvpn-gui --connect ' + chosen_server + suffix
     else:
-        cmd = 'openvpn '+ os.path.join(arg.path_files, chosen_server) + '.tcp443.ovpn'
+        cmd = 'openvpn '+ os.path.join(arg.path_files, chosen_server) + suffix
     subprocess.call(cmd , shell=True)
