@@ -5,8 +5,11 @@ import platform
 import sys
 import os
 import threading
-import urllib2
 import json
+try:
+    import urllib.request as urllib2
+except ImportError:
+    import urllib2
 
 
 __author__ = "Fabian Landis"
@@ -122,6 +125,7 @@ if __name__ == '__main__':
     cmdline_parse.add_argument('-v', '--verbose', help='print additional informations', default=False,
                                action='store_true')
     cmdline_parse.add_argument('-u', '--udp', help='use udp instead of tcp',action="store_true")
+    cmdline_parse.add_argument('-n', '--no_run', help='do not trigger openvpn at the end',action="store_true")
 
     arg = cmdline_parse.parse_args()
 
@@ -153,4 +157,7 @@ if __name__ == '__main__':
         cmd = 'openvpn-gui --connect ' + chosen_server + suffix
     else:
         cmd = 'openvpn '+ os.path.join(arg.path_files, chosen_server) + suffix
-    subprocess.call(cmd , shell=True)
+    if arg.no_run:
+        print(cmd)
+    else:
+        subprocess.call(cmd , shell=True)
