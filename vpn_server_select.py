@@ -18,14 +18,8 @@ __email__ = "flandis@flandis.com"
 """
 Script to select a vpn server to connect to from a list of config files. The
 script chooses the server with the lowest latency and lowest server load of
-all server or within an area (depending on the command line options). The
-following options can be provided to the script via command line or
-set in a config file:
-config_file: path to a config file - same parameters as command line options
-    can be used
-selection_metrics: 1) latency, 2) server load, 3) latency, then load
-openvpn_path: path to openvpn executable
-regex: regex to match dns name to restrict server selection
+all server or within an area (depending on the command line options). For
+options use the --help option.
 """
 MAX_LATENCY = 10000
 single_matcher = re.compile(" time=(?P<time>\d+(.\d+)?)")
@@ -133,7 +127,6 @@ if __name__ == '__main__':
         c = open(arg.config_file, 'r+')
 
     # TODO: Unpack config parameters from config file
-    # TODO: Implement other metrics besides latency
 
     tryservers = set()
     fname_matcher = re.compile('(?P<dns>\w+\.' + vpn_domain + ')\.(?P<protocol>\w+\d+)\.ovpn')
