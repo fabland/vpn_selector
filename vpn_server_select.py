@@ -71,7 +71,7 @@ def choose_server(serverlist, regex=None, metrics='1'):
 def server_load(serverlist, regex=None):
     server_loads = {}
     response = urllib2.urlopen('https://api.nordvpn.com/server')
-    for server in json.loads(response.read()):
+    for server in json.loads(response.read().decode('utf-8') ):
         if regex is None or re.match(regex, str(server['domain'])):
             if str(server['domain']) in serverlist:
                 server_loads[str(server['domain'])] = server['load']
